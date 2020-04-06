@@ -12,58 +12,30 @@ import matplotlib.pyplot as plt
 ###########
 
 class EchoStateNetwork:
-    def __init__(self, iw, res, ow):
-        self.iw = iw
+    def __init__(self, input, res, outputsize):
+        self.input = input
         self.res = res
-        self.ow = ow
+        self.outputsize = outputsize
 
         # TODO: changed weights initialization to half standard normal and
         #       removed bias
 
-        self.inputweights = np.random.randn(iw, res) * 0.25
+        self.inputweights = np.random.randn(input, res) * 0.25
         self.reservoirweights = np.random.randn(res, res) * 0.25
-        self.outputweights = np.random.randn(res+1, ow) * 0.25
+        self.outputweights = np.random.randn(res, outputsize) * 0.25
+        # self.outputweights = np.random.randn(res+1, output) * 0.25
 
-        # self.reservoirweights[res] = np.zeros((1, res)) 
 
-        # print(self.reservoirweights.shape)
+
 
         # TODO: changed output initialization and input size of activities
-        # self.output = np.array
-        self.output = np.zeros((1, 1))
-        # self.activ = np.zeros((3, res+1))
-        self.activ = np.zeros((1, res+1))
+        self.output = np.zeros((1, outputsize))
+        self.activ = np.zeros((outputsize, res))
+        # self.activ = np.zeros((1, res+1))
 
     def forwardPass(self, reservoir_input):
 
         # TODO: changed forward pass computation
-        """
-        # x = np.zeros((self.iw, self.res+1))
-        a = 0.3
-        # print(np.shape(self.inputweights[0]))
-        # print(np.shape(np.vstack((1, input[0]))))
-
-        # print(input[0])
-        # print(self.inputweights[0])
-        # print(np.tanh(np.dot(input[0], self.inputweights[0])))
-
-        x =  dot(input, self.inputweights )
-        # print("shape x davor: ", x.shape)
-        # x = np.append(x, 0.0)
-        # print("x",x)
-
-        # print("shape x: ", np.ravel(x).shape)
-        # print("shape rw: ", self.reservoirweights.shape)
-
-        # x = (1-a)*x + a*np.tanh( dot(np.squeeze(x), self.reservoirweights))
-        x = np.tanh( dot(np.squeeze(x), self.reservoirweights))
-
-        x = np.append(x, 1)
-
-        self.activ[1] = np.ravel(x)
-
-        self.output =  dot(x,self.outputweights)
-        """
 
         # Compute the input that is fed into the reservoir
         external_input = reservoir_input * self.inputweights
@@ -79,8 +51,8 @@ class EchoStateNetwork:
         )
         
         # bias
-        one = np.array([[1]])
-        res_act = np.concatenate((res_act, one), axis=1)
+        # one = np.array([[1]])
+        # res_act = np.concatenate((res_act, one), axis=1)
 
         # Update the ESN's reservoir activity
         self.activ = res_act
@@ -95,7 +67,7 @@ class EchoStateNetwork:
 
     def reset(self):
         # TODO: changed the dimensionality of the activity
-        self.activ = np.zeros((1, self.res))
+        self.activ = np.zeros((self.outputsize, self.res))
 
     def oscillator(self):
         self.forwardPass(self.output)
@@ -116,14 +88,15 @@ class EchoStateNetwork:
             self.teacherForcing(seq[i])
 
         # TODO: renamed a to activities and removed b  # to training_sequence
-        # a = np.zeros((training, self.res+1))
-        # b = np.zeros((training, 1))
-        activities = np.zeros((training, self.res+1))
-        training_sequence = np.zeros((training, 1))
+
+        activities = np.zeros((training, self.res))
+        # activities = np.zeros((training, self.res+1))
+
+        training_sequence = np.zeros((training, self.outputsize))
 
 
         # TODO: renamed c to net_out
-        net_out = np.zeros((training, 1))
+        net_out = np.zeros((training, self.outputsize))
 
         # Training
         for i in range(washout, washout + training):
@@ -132,18 +105,11 @@ class EchoStateNetwork:
             # TODO: since output and activity dimensionalities have been
             #       changed (see __init__ and forwardPass), these line were
             #       adapted accordingly
+
             # net_out[i-washout] = self.output
-
-
-            # print("n ",net_out.shape)
-            # print("o ", self.output.shape)
-            # print(net_out[i-washout, 0])
-            # print(self.output)
-
 
             net_out[i - washout, 0] = self.output
 
-            # activities[i-washout] = self.activ[1]
             activities[i - washout] = self.activ
 
             self.teacherForcing(seq[i])
@@ -159,13 +125,6 @@ class EchoStateNetwork:
         # to calculate output weights according to
         # W_out * activities = net_out
         #              W_out = net_out * pinv(activities)
-
-
-
-        # activitiesb = np.zeros((training, self.res+1))
-        # for i in range(training):
-        #     activitiesb[i] = np.append(activities[i], 1)
-
 
         inv_activities = np.linalg.pinv(activities)
 
@@ -212,7 +171,7 @@ class EchoStateNetwork:
             self.teacherForcing(seq[i])
 
         # TODO: as above, renamed c to net_out
-        net_out = np.zeros((test, 1))
+        net_out = np.zeros((test, self.outputsize))
 
 
         # test
@@ -223,7 +182,7 @@ class EchoStateNetwork:
             net_out[i - washout, 0] = self.output
 
             # TODO: actually, testing should work without teacher forcing...
-            self.teacherForcing(seq[i])
+            # self.teacherForcing(seq[i])
 
         # Briefly visualize performance
         plt.plot(range(test), seq[washout: washout + test], label="Target")
@@ -267,5 +226,18 @@ seq = np.array
 seq = np.loadtxt("sequence.txt")
 
 
+
+
+fs = 700 # sample rate 
+f = 20 # the frequency of the signal
+
+x = np.arange(fs) # the points on the x axis for plotting
+# compute the value (amplitude) of the sin wave at the for each sample
+y = np.sin(2*np.pi*f * (x/fs)) 
+
+
+sin = np.sin(y)
+
+
 esn = EchoStateNetwork(1, 10, 1)
-esn.train(seq, 100, 400, 200)
+esn.train(sin, 100, 400, 200)
